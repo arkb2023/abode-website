@@ -1,6 +1,6 @@
-# build
-# test
-# deploy
+// build
+// test
+// deploy
 pipeline {
     agent any
     environment {
