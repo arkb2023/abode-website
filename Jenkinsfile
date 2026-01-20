@@ -7,7 +7,7 @@ pipeline {
         DOCKER_HUB_USER = "arkb2023"
         IMAGE_NAME = "abode-website"
         //BUILD_TAG = "v1.0-${BUILD_NUMBER}-${GIT_COMMIT:0:7}"
-        BUILD_TAG       = "v1.0-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+        //BUILD_TAG       = "v1.0-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
     }
     parameters {
         string(name: 'PROD_HOST', defaultValue: '10.158.148.115', description: 'Prod VM IP')
@@ -17,7 +17,7 @@ pipeline {
         stage('Build') {
             steps {
               script {
-                env.BUILD_TAG = "v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT?.take(7) ?: 'local'}"
+                  env.BUILD_TAG = "v1.0-${BUILD_NUMBER}"
               }
               withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
                                                 usernameVariable: 'DOCKER_USER', 
@@ -26,7 +26,7 @@ pipeline {
                 docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG} .
                 echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                 docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}
-                echo "BUILD_TAG=${BUILD_TAG}" > build.properties
+                #echo "BUILD_TAG=${BUILD_TAG}" > build.properties
                 '''
               }
             }
@@ -35,32 +35,22 @@ pipeline {
             steps {
               script {
                 sh '''
-                  build_prop=${cat build.properties}
-                  echo "build_prop: ${build_prop}"
-                  #. build.properties 2>/dev/null || BUILD_TAG="v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                  . build.properties 2>/dev/null
-                  echo "After build properties"
-                  echo "DOCKER_HUB_USER: ${DOCKER_HUB_USER}"
-                  echo "IMAGE_NAME: ${IMAGE_NAME}"
-                  echo "BUILD_TAG: ${BUILD_TAG}"
-                  IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
-                  echo "Testing image: ${IMAGE}"
-                  # sh 'bash tests/test.sh ${DOCKER_HUB_USER} ${IMAGE_NAME} ${BUILD_TAG}'
-                  # Test 1: Files exist
-                  docker run --rm ${IMAGE} sh -c "
-                    ls -la /var/www/html/ &&
-                    test -f /var/www/html/index.html &&
-                    test -f /var/www/html/images/github3.jpg &&
-                    echo 'Files OK!'
-                  "
-                  # Health check (Apache responds)
-                  docker run -d -p 8080:80 --name test-web "${IMAGE}"
-                  sleep 3
-                  curl -f http://localhost:8080/ || exit 1
-                  docker stop test-web || true
-                  docker rm test-web || true
-                  
-                  echo "All tests PASSED!"
+                IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                echo "Testing: $IMAGE"
+                
+                # Test files
+                docker run --rm "$IMAGE" ls -la /var/www/html/
+                docker run --rm "$IMAGE" test -f /var/www/html/index.html
+                docker run --rm "$IMAGE" test -f /var/www/html/images/github3.jpg
+                
+                # Health check (use 8081 - Jenkins=8080)
+                docker rm -f test-web 2>/dev/null || true
+                docker run -d --name test-web -p 8081:80 "$IMAGE"
+                sleep 5
+                curl -f http://localhost:8081/
+                docker stop test-web && docker rm test-web
+                
+                echo "Tests PASSED!"
                 '''
               }
             }
@@ -70,15 +60,14 @@ pipeline {
             steps {
                 sshagent(credentials: ['prod-ssh-key']) {
                     sh '''
-                    . build.properties
                     ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << EOF
-                    IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
-                    echo "Deploying image: ${IMAGE}"
-                    docker pull ${IMAGE}
-                    docker stop webapp || true
-                    docker rm webapp || true
-                    docker run -d --name webapp -p 80:80 ${IMAGE}
-                    docker ps | grep webapp
+                      IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                      echo "Deploying image: ${IMAGE}"
+                      docker pull ${IMAGE}
+                      docker stop webapp || true
+                      docker rm webapp || true
+                      docker run -d --name webapp -p 80:80 ${IMAGE}
+                      docker ps | grep webapp
                     EOF
                     '''
                 }
