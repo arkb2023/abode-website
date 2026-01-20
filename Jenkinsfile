@@ -55,11 +55,13 @@ pipeline {
               }
             }
         }
+        echo "Triggered by branch: ${env.branch}, SHA: ${env.sha}"
         stage('Deploy Prod') {
-            when { branch 'main' }
+              when { expression { env.branch == 'refs/heads/main' } }
             steps {
                 sshagent(credentials: ['prod-ssh-key']) {
                     sh '''
+                    echo "Deploying to prod!"
                     ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << EOF
                       IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
                       echo "Deploying image: ${IMAGE}"
