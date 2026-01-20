@@ -55,26 +55,33 @@ pipeline {
               }
             }
         }
-        echo "Triggered by branch: ${env.branch}, SHA: ${env.sha}"
-        stage('Deploy Prod') {
-              when { expression { env.branch == 'refs/heads/main' } }
-            steps {
-                sshagent(credentials: ['prod-ssh-key']) {
-                    sh '''
-                    echo "Deploying to prod!"
-                    ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << EOF
-                      IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
-                      echo "Deploying image: ${IMAGE}"
-                      docker pull ${IMAGE}
-                      docker stop webapp || true
-                      docker rm webapp || true
-                      docker run -d --name webapp -p 80:80 ${IMAGE}
-                      docker ps | grep webapp
-                    EOF
-                    '''
-                }
-            }
+
+      stage('Print Trigger Info') {
+        steps {
+          echo "Triggered by branch: ${env.branch}, SHA: ${env.sha}"
         }
+      }        
+      stage('Deploy Prod') {
+        when {
+          expression { env.branch == 'refs/heads/main' }
+        }
+        steps {
+          echo "Deploying to prod!"
+          sshagent(credentials: ['prod-ssh-key']) {
+              sh '''    
+              ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << EOF
+                IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                echo "Deploying image: ${IMAGE}"
+                docker pull ${IMAGE}
+                docker stop webapp || true
+                docker rm webapp || true
+                docker run -d --name webapp -p 80:80 ${IMAGE}
+                docker ps | grep webapp
+              EOF
+              '''
+          }
+        }
+      }
     }
     post {
         always {
