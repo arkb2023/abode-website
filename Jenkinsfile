@@ -32,8 +32,23 @@ pipeline {
             steps {
               script {
                 sh '''
-                  source build.properties || echo BUILD_TAG="v1.0-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                  sh 'bash tests/test.sh'
+                  . build.properties 2>/dev/null || BUILD_TAG="v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT.take(7)"
+                  echo "Testing image: ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                  # sh 'bash tests/test.sh ${DOCKER_HUB_USER} ${IMAGE_NAME} ${BUILD_TAG}'
+                  docker run --rm ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG} sh -c "
+                    ls -la /var/www/html/ &&
+                    test -f /var/www/html/index.html &&
+                    test -f /var/www/html/images/github3.jpg &&
+                    echo 'Files present'
+                  "
+                  # Health check (Apache responds)
+                  docker run --rm -p 8080:80 --name test-web ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG} &
+                  sleep 3
+                  curl -f http://localhost:8080/ || exit 1
+                  docker stop test-web || true
+                  docker rm test-web || true
+                  
+                  echo "All tests PASSED!"
                 '''
               }
             }
@@ -50,6 +65,7 @@ pipeline {
                     docker stop webapp || true
                     docker rm webapp || true
                     docker run -d --name webapp -p 80:80 ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}
+                    docker ps | grep webapp
                     EOF
                     '''
                 }
