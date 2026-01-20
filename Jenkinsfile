@@ -16,6 +16,9 @@ pipeline {
     stages {
         stage('Build') {
             steps {
+              script {
+                env.BUILD_TAG = "v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT?.take(7) ?: 'local'}"
+              }
               withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
                                                 usernameVariable: 'DOCKER_USER', 
                                                 passwordVariable: 'DOCKER_PASS')]) {
@@ -32,7 +35,14 @@ pipeline {
             steps {
               script {
                 sh '''
-                  . build.properties 2>/dev/null || BUILD_TAG="v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                  build_prop=${cat build.properties}
+                  echo "build_prop: ${build_prop}"
+                  #. build.properties 2>/dev/null || BUILD_TAG="v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                  . build.properties 2>/dev/null
+                  echo "After build properties"
+                  echo "DOCKER_HUB_USER: ${DOCKER_HUB_USER}"
+                  echo "IMAGE_NAME: ${IMAGE_NAME}"
+                  echo "BUILD_TAG: ${BUILD_TAG}"
                   IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
                   echo "Testing image: ${IMAGE}"
                   # sh 'bash tests/test.sh ${DOCKER_HUB_USER} ${IMAGE_NAME} ${BUILD_TAG}'
