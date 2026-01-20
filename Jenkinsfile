@@ -32,17 +32,19 @@ pipeline {
             steps {
               script {
                 sh '''
-                  . build.properties 2>/dev/null || BUILD_TAG="v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT.take(7)"
-                  echo "Testing image: ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                  . build.properties 2>/dev/null || BUILD_TAG="v1.0-${BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                  IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                  echo "Testing image: ${IMAGE}"
                   # sh 'bash tests/test.sh ${DOCKER_HUB_USER} ${IMAGE_NAME} ${BUILD_TAG}'
-                  docker run --rm ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG} sh -c "
+                  # Test 1: Files exist
+                  docker run --rm ${IMAGE} sh -c "
                     ls -la /var/www/html/ &&
                     test -f /var/www/html/index.html &&
                     test -f /var/www/html/images/github3.jpg &&
-                    echo 'Files present'
+                    echo 'Files OK!'
                   "
                   # Health check (Apache responds)
-                  docker run --rm -p 8080:80 --name test-web ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG} &
+                  docker run -d -p 8080:80 --name test-web "${IMAGE}"
                   sleep 3
                   curl -f http://localhost:8080/ || exit 1
                   docker stop test-web || true
@@ -58,13 +60,14 @@ pipeline {
             steps {
                 sshagent(credentials: ['prod-ssh-key']) {
                     sh '''
-                    source build.properties
-                    //ssh ubuntu@<PROD_EC2_IP> << EOF
+                    . build.properties
                     ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << EOF
-                    docker pull ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}
+                    IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+                    echo "Deploying image: ${IMAGE}"
+                    docker pull ${IMAGE}
                     docker stop webapp || true
                     docker rm webapp || true
-                    docker run -d --name webapp -p 80:80 ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}
+                    docker run -d --name webapp -p 80:80 ${IMAGE}
                     docker ps | grep webapp
                     EOF
                     '''
