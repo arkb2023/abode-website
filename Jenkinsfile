@@ -29,6 +29,8 @@ pipeline {
                         env.BUILD_TAG_PREFIX = props.BUILD_TAG_PREFIX ?: 'v1.0'
                         env.PROD_HOST = params.PROD_HOST ?: props.PROD_HOST ?: '10.158.148.115'
                         env.PROD_USER = params.PROD_USER ?: props.PROD_USER ?: 'ubuntu'
+                        env.TEST_HOST = params.TEST_HOST ?: props.TEST_HOST ?: '10.158.148.84'
+                        env.TEST_USER = params.TEST_USER ?: props.TEST_USER ?: 'ubuntu'
                         env.TEST_PORT = props.TEST_PORT ?: '8081'
                         
                         // Calculate BUILD_TAG
@@ -49,6 +51,7 @@ pipeline {
                         echo "Branch: ${env.SHORT_BRANCH}"
                         echo "Build Mode: ${env.IS_MAIN == 'true' ? 'FULL (Build→Test→Deploy)' : 'TEST ONLY (Build→Test)'}"
                         echo "Prod Target: ${env.PROD_USER}@${env.PROD_HOST}"
+                        echo "Test Target: ${env.TEST_USER}@${env.TEST_HOST}:${env.TEST_PORT}"
                         echo "════════════════════════════════════════════════"
                         
                     } catch (Exception e) {
@@ -60,11 +63,14 @@ pipeline {
                         env.BUILD_TAG_PREFIX = 'v1.0'
                         env.PROD_HOST = params.PROD_HOST ?: '10.158.148.115'
                         env.PROD_USER = params.PROD_USER ?: 'ubuntu'
+                        env.TEST_HOST = params.TEST_HOST ?: '10.158.148.84'
+                        env.TEST_USER = params.TEST_USER ?: 'ubuntu'                  
+                        env.TEST_PORT = env.TEST_PORT ?: '8081'
                         env.BUILD_TAG = "${env.BUILD_TAG_PREFIX}-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
                         env.IMAGE = "${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:${env.BUILD_TAG}"
                         env.SHORT_BRANCH = env.GIT_BRANCH ?: 'unknown'
                         env.IS_MAIN = (env.SHORT_BRANCH == 'main') ? 'true' : 'false'
-                        env.TEST_PORT = env.TEST_PORT ?: '8081'
+
                     }
                 }
             }
@@ -85,13 +91,15 @@ pipeline {
         
         stage('Test') {
             steps {
-                sh '''
-                    chmod +x ./scripts/test.sh
-                    ./scripts/test.sh "${IMAGE}" 10 3 "${TEST_PORT}"
-                '''
+              echo "Running tests on Test Host (${env.SHORT_BRANCH} branch)"
+              sshagent(credentials: ['testrunner-ssh-key']) {
+                  sh '''
+                      chmod +x ./scripts/test.sh
+                      ./scripts/test-vm.sh "${TEST_USER}" "${TEST_HOST}" "${IMAGE}"
+                  '''
+              }            
             }
         }
-        
         stage('Deploy Prod') {
             when {
                 expression { env.IS_MAIN == 'true' }
