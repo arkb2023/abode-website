@@ -10,3 +10,6 @@ RUN chown -R www-data:www-data /var/www/html/ \
 # Apache already serves /var/www/html/ by default
 # No CMD override needed
 EXPOSE 80
+
+# Ensure Apache starts cleanly
+CMD ["/bin/bash", "-c", "pkill -f apache || true && apache2ctl -D FOREGROUND"]
