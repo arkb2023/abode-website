@@ -6,7 +6,6 @@ pipeline {
     environment {
         DOCKER_HUB_USER = "arkb2023"
         IMAGE_NAME = "abode-website"
-        //BUILD_TAG = "v1.0-${BUILD_NUMBER}-${GIT_COMMIT:0:7}"
         BUILD_TAG       = "v1.0-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
     }
     parameters {
@@ -16,9 +15,6 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-              // script {
-              //     env.BUILD_TAG = "v1.0-${BUILD_NUMBER}"
-              // }
               withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
                                                 usernameVariable: 'DOCKER_USER', 
                                                 passwordVariable: 'DOCKER_PASS')]) {
@@ -80,8 +76,9 @@ pipeline {
           sshagent(credentials: ['prod-ssh-key']) {
               sh '''    
               IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
+              echo "1. IMAGE: >>${IMAGE}<<"
               ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'EOF'
-                echo "Deploying image: ${IMAGE}"
+                echo "2. Inside Shell Script - IMAGE: >>${IMAGE}<<"
                 docker pull ${IMAGE}
                 docker stop webapp || true
                 docker rm webapp || true
