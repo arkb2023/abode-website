@@ -69,7 +69,7 @@ pipeline {
           echo "Deploying to prod!"
           sshagent(credentials: ['prod-ssh-key']) {
               sh '''    
-              ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << EOF
+              ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'EOF'
                 IMAGE="${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_TAG}"
                 echo "Deploying image: ${IMAGE}"
                 docker pull ${IMAGE}
@@ -77,7 +77,7 @@ pipeline {
                 docker rm webapp || true
                 docker run -d --name webapp -p 80:80 ${IMAGE}
                 docker ps | grep webapp
-              EOF
+EOF
               '''
           }
         }
