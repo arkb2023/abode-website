@@ -55,7 +55,7 @@ docker run --rm ${IMAGE} test -f /var/www/html/images/github3.jpg || {
 echo "images/github3.jpg found"
 echo ""
 
-# Start test container
+# Start test container with longer startup buffer
 echo "Starting test container..."
 docker run -d --name test-web -p 8081:80 ${IMAGE} > /dev/null || {
   echo "Failed to start test container"
@@ -65,31 +65,71 @@ TEST_CONTAINER_ID=$(docker ps --filter "name=test-web" -q)
 echo "Test container started: ${TEST_CONTAINER_ID}"
 echo ""
 
+# Initial wait for service startup (Apache needs time)
+echo "Waiting for service to start (initial 5s buffer)..."
+sleep 5
+echo "   Starting healthcheck probes..."
+echo ""
+
 # Healthcheck with retry loop
 echo "Running healthcheck (max ${MAX_ATTEMPTS} attempts, ${SLEEP_INTERVAL}s interval)..."
 HEALTHCHECK_PASSED=0
+ATTEMPT_COUNT=0
 
 for i in $(seq 1 $MAX_ATTEMPTS); do
+  ATTEMPT_COUNT=$i
   sleep $SLEEP_INTERVAL
   
+  # Debug: Check container status
+  if ! docker ps --filter "name=test-web" --quiet | grep -q . 2>/dev/null; then
+    echo "Container crashed/exited"
+    echo ""
+    echo "Container logs:"
+    docker logs test-web 2>/dev/null || true
+    echo ""
+    echo "Cleaning up..."
+    docker rm -f test-web 2>/dev/null || true
+    exit 1
+  fi
+  
+  # Debug: Check port binding
+  PORT_CHECK=$(docker port test-web 80/tcp 2>/dev/null || echo "not_bound")
+  
+  # Try curl with verbose on failure
   if curl -f -s http://localhost:8081/ > /dev/null 2>&1; then
     echo "Healthcheck PASSED on attempt $i"
     HEALTHCHECK_PASSED=1
     break
   fi
   
+  # Show debug info on every 3rd attempt
+  if [ $((i % 3)) -eq 0 ]; then
+    echo "   [Debug] Attempt $i - Port binding: $PORT_CHECK"
+    echo "   [Debug] Container still running: $(docker ps --filter 'name=test-web' -q)"
+  fi
+  
   echo "Attempt $i/$MAX_ATTEMPTS failed, retrying..."
 done
 
 if [ "$HEALTHCHECK_PASSED" != "1" ]; then
-  echo "Healthcheck failed after $MAX_ATTEMPTS attempts"
+  echo "Healthcheck failed after $ATTEMPT_COUNT attempts"
   echo ""
-  echo "Container logs:"
-  docker logs test-web 2>/dev/null || true
+  echo "Container info:"
+  docker ps -a --filter "name=test-web" || true
+  echo ""
+  echo "Port binding:"
+  docker port test-web 2>/dev/null || echo "   (not available)"
+  echo ""
+  echo "Container logs (last 50 lines):"
+  docker logs test-web 2>/dev/null | tail -50 || true
+  echo ""
+  echo "Network diagnostics from host:"
+  echo "   Checking if port 8081 is listening:"
+  netstat -tuln | grep 8081 || echo "   (port 8081 not listening on host)"
   echo ""
   echo "Cleaning up..."
   docker stop test-web 2>/dev/null || true
-  docker rm test-web 2>/dev/null || true
+  docker rm -f test-web 2>/dev/null || true
   exit 1
 fi
 echo ""
@@ -113,7 +153,7 @@ echo ""
 # Cleanup test container
 echo "Cleaning up test container..."
 docker stop test-web 2>/dev/null || true
-docker rm test-web 2>/dev/null || true
+docker rm -f test-web 2>/dev/null || true
 echo "Cleanup done"
 echo ""
 
