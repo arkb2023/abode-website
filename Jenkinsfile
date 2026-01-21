@@ -95,7 +95,7 @@ pipeline {
               sshagent(credentials: ['testrunner-ssh-key']) {
                   sh '''
                       chmod +x ./scripts/test.sh
-                      ./scripts/test-vm.sh "${TEST_USER}" "${TEST_HOST}" "${IMAGE}"
+                      ./scripts/test.sh "${TEST_USER}" "${TEST_HOST}" "${IMAGE}"
                   '''
               }            
             }
