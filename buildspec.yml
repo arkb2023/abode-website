@@ -1,0 +1,25 @@
+version: 0.2
+env:
+  secrets-manager:
+    DOCKERHUB_USERNAME: "codebuild/dockerhub/credentials:username"
+    DOCKERHUB_PASSWORD: "codebuild/dockerhub/credentials:password"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging into Docker Hub..."
+      - echo "$DOCKERHUB_PASSWORD" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+  build:
+    commands:
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - echo "Building $IMAGE_TAG..."
+      - docker build -t arkb2023/abode-website:$IMAGE_TAG .
+      - docker tag arkb2023/abode-website:$IMAGE_TAG arkb2023/abode-website:latest
+  post_build:
+    commands:
+      - echo "Pushing to Docker Hub..."
+      - docker push arkb2023/abode-website:$IMAGE_TAG
+      - docker push arkb2023/abode-website:latest
+      - echo "Image pushed successfully"
+
+#cd ~/workspace/abode-website && git add buildspec.yml && git commit -m "docker hub push working" && git push origin main
