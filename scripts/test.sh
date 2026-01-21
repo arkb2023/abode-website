@@ -23,7 +23,9 @@ echo ""
 
 ssh -o StrictHostKeyChecking=no ${TEST_USER}@${TEST_HOST} << REMOTE_TEST_EOF
   set -e
-  
+  docker rm -f test-web 2>/dev/null || true
+  docker image prune -f --filter "until=2h"
+
   # Create test directories
   mkdir -p /var/lib/test-artifacts /var/log/test-runner /tmp/test-logs
   
@@ -210,9 +212,11 @@ ssh -o StrictHostKeyChecking=no ${TEST_USER}@${TEST_HOST} << REMOTE_TEST_EOF
   echo "Cleaning up test container..."
   docker stop test-web 2>/dev/null || true
   docker rm -f test-web 2>/dev/null || true
+  docker image prune -f --filter "dangling=true"
   echo "Cleanup done"
   echo ""
-  
+
+
   # Save test results
   mkdir -p /var/lib/test-artifacts
   cp /tmp/test-output.log /var/lib/test-artifacts/test-\$(date +%Y%m%d-%H%M%S).log 2>/dev/null || true
@@ -222,6 +226,7 @@ ssh -o StrictHostKeyChecking=no ${TEST_USER}@${TEST_HOST} << REMOTE_TEST_EOF
   echo "Test logs saved to /var/lib/test-artifacts/"
   echo "Total time: \$((\$(date +%s) - \$START_TIME))s"
   echo "════════════════════════════════════════════════"
+
 REMOTE_TEST_EOF
 
 # Exit with SSH command status
