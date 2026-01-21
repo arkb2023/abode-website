@@ -87,7 +87,7 @@ pipeline {
             steps {
                 sh '''
                     chmod +x ./scripts/test.sh
-                    ./scripts/test.sh "${IMAGE}" 10 3 "${TEST_PORT}
+                    ./scripts/test.sh "${IMAGE}" 10 3 "${TEST_PORT}"
                 '''
             }
         }
