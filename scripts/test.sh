@@ -45,19 +45,29 @@ ssh -o StrictHostKeyChecking=no ${TEST_USER}@${TEST_HOST} << REMOTE_TEST_EOF
   fi
   
   echo "════════════════════════════════════════════════"
-  echo "Testing Docker Image"
+  echo "Testing Docker Image on ${TEST_HOST} server"
   echo "════════════════════════════════════════════════"
   echo "Image: \${IMAGE}"
   echo "Healthcheck attempts: \${MAX_ATTEMPTS}"
   echo "Sleep interval: \${SLEEP_INTERVAL}s"
   echo ""
-  
+
   # Cleanup any previous test container
   echo "Cleaning up previous test containers..."
   docker rm -f test-web 2>/dev/null || true
   echo "Cleanup done"
   echo ""
-  
+
+  # Pull latest image
+  echo "Pulling image from Docker Hub..."
+  echo "   Image: \${IMAGE}"
+  docker pull \${IMAGE} || {
+    echo "Failed to pull image"
+    exit 1
+  }
+  echo "Image pulled successfully"
+  echo ""
+
   # Verify files in image
   echo "Verifying files in image..."
   echo "   Listing /var/www/html/:"

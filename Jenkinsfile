@@ -92,7 +92,7 @@ pipeline {
         stage('Test') {
             steps {
               echo "Running tests on Test Host (${env.SHORT_BRANCH} branch)"
-              sshagent(credentials: ['testrunner-ssh-key']) {
+              sshagent(credentials: ['prod-ssh-key']) {
                   sh '''
                       chmod +x ./scripts/test.sh
                       ./scripts/test.sh "${TEST_USER}" "${TEST_HOST}" "${IMAGE}"
