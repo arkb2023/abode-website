@@ -64,6 +64,7 @@ pipeline {
                         env.IMAGE = "${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:${env.BUILD_TAG}"
                         env.SHORT_BRANCH = env.GIT_BRANCH ?: 'unknown'
                         env.IS_MAIN = (env.SHORT_BRANCH == 'main') ? 'true' : 'false'
+                        env.TEST_PORT = env.TEST_PORT ?: '8081'
                     }
                 }
             }
@@ -86,7 +87,7 @@ pipeline {
             steps {
                 sh '''
                     chmod +x ./scripts/test.sh
-                    ./scripts/test.sh "${IMAGE}" 10 3
+                    ./scripts/test.sh "${IMAGE}" 10 3 "${TEST_PORT}
                 '''
             }
         }

@@ -9,6 +9,7 @@ set -e
 IMAGE="${1}"
 MAX_ATTEMPTS="${2:-10}"
 SLEEP_INTERVAL="${3:-3}"
+TEST_PORT="${4:-9081}"
 
 # Validate arguments
 if [ -z "$IMAGE" ]; then
@@ -57,12 +58,30 @@ echo ""
 
 # Start test container with longer startup buffer
 echo "Starting test container..."
-docker run -d --name test-web -p 8081:80 ${IMAGE} > /dev/null || {
+docker run -d --name test-web -p ${TEST_PORT}:80 ${IMAGE} > /dev/null || {
   echo "Failed to start test container"
   exit 1
 }
 TEST_CONTAINER_ID=$(docker ps --filter "name=test-web" -q)
 echo "Test container started: ${TEST_CONTAINER_ID}"
+echo ""
+
+# Check if container is still running immediately
+sleep 2
+if ! docker ps --filter "name=test-web" --quiet | grep -q . 2>/dev/null; then
+  echo "Container exited immediately after startup"
+  echo ""
+  echo "Container logs:"
+  docker logs test-web 2>/dev/null || true
+  echo ""
+  echo "Debugging info:"
+  echo "   Checking if port 80 is already bound on host:"
+  netstat -tuln | grep ":80 " || echo "   (port 80 not listening)"
+  echo ""
+  echo "Cleaning up..."
+  docker rm -f test-web 2>/dev/null || true
+  exit 1
+fi
 echo ""
 
 # Initial wait for service startup (Apache needs time)
@@ -96,7 +115,7 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
   PORT_CHECK=$(docker port test-web 80/tcp 2>/dev/null || echo "not_bound")
   
   # Try curl with verbose on failure
-  if curl -f -s http://localhost:8081/ > /dev/null 2>&1; then
+  if curl -f -s http://localhost:${TEST_PORT}/ > /dev/null 2>&1; then
     echo "Healthcheck PASSED on attempt $i"
     HEALTHCHECK_PASSED=1
     break
@@ -124,8 +143,8 @@ if [ "$HEALTHCHECK_PASSED" != "1" ]; then
   docker logs test-web 2>/dev/null | tail -50 || true
   echo ""
   echo "Network diagnostics from host:"
-  echo "   Checking if port 8081 is listening:"
-  netstat -tuln | grep 8081 || echo "   (port 8081 not listening on host)"
+  echo "   Checking if port ${TEST_PORT} is listening:"
+  netstat -tuln | grep ${TEST_PORT} || echo "   (port ${TEST_PORT} not listening on host)"
   echo ""
   echo "Cleaning up..."
   docker stop test-web 2>/dev/null || true
@@ -136,8 +155,8 @@ echo ""
 
 # Final smoke test
 echo "Running final smoke test..."
-echo "   Fetching http://localhost:8081/..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/)
+echo "   Fetching http://localhost:${TEST_PORT}/..."
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${TEST_PORT}/)
 if [ "$HTTP_CODE" -eq 200 ]; then
   echo "HTTP 200 OK"
 else
@@ -147,7 +166,7 @@ fi
 echo ""
 
 echo "Response preview:"
-curl -s http://localhost:8081/ | head -15
+curl -s http://localhost:${TEST_PORT}/ | head -15
 echo ""
 
 # Cleanup test container

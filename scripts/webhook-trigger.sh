@@ -106,10 +106,14 @@ send_webhook() {
   # Construct webhook URL
   WEBHOOK_URL="http://${JENKINS_HOST}${WEBHOOK_ENDPOINT}?token=${JENKINS_TOKEN}"
   
-  # Construct payload
+  # Generate a fake commit SHA (8 chars)
+  FAKE_SHA=$(openssl rand -hex 4 2>/dev/null || echo "deadbeef")
+  
+  # Construct payload (matches GitHub webhook format)
   PAYLOAD=$(cat <<EOF
 {
   "ref": "${branch}",
+  "after": "${FAKE_SHA}",
   "repository": {
     "full_name": "${GITHUB_REPO}"
   },
