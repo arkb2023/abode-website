@@ -28,7 +28,7 @@ phases:
       - IMAGE_TAG="${BRANCH}-v1.0-${BUILD_NUM}-${COMMIT_SHA}" 
       - echo "Building:" "arkb2023/abode-website:${IMAGE_TAG}"
       - docker build -t arkb2023/abode-website:${IMAGE_TAG} .
-      - docker tag arkb2023/abode-website:${IMAGE_TAG} arkb2023/abode-website:latest
+      #- docker tag arkb2023/abode-website:${IMAGE_TAG} arkb2023/abode-website:latest
       
   post_build:
     commands:
@@ -45,7 +45,7 @@ phases:
       - echo "BUILD_NUM:" "$BUILD_NUM"
       - IMAGE_TAG="${BRANCH}-v1.0-${BUILD_NUM}-${COMMIT_SHA}" 
       - docker push arkb2023/abode-website:${IMAGE_TAG}
-      - docker push arkb2023/abode-website:latest
+      #- docker push arkb2023/abode-website:latest
       - echo "Push Complete"
       - echo "Image:" "arkb2023/abode-website:${IMAGE_TAG}"
       - echo "Branch:" "${BRANCH}"
