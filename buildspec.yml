@@ -60,7 +60,17 @@ phases:
       - echo ""
       - echo "════════════════════════════════════════════════"
       - echo "Push Complete"
-      - echo "════════════════════════════════
+      - echo "════════════════════════════════════════════════"
+      - echo "Image: arkb2023/abode-website:${IMAGE_TAG}"
+      - echo "Branch: ${BRANCH}"
+      - echo "Commit: ${COMMIT_SHA}"
+      - |
+        if [ "$DEPLOY_TO_PROD" == "true" ]; then
+          echo "Action: Jenkins will TEST + DEPLOY to prod"
+        else
+          echo "Action: Jenkins will TEST only"
+        fi
+      - echo "════════════════════════════════════════════════"
 
 
 #cd ~/workspace/abode-website && git add buildspec.yml && git commit -m "docker hub push working" && git push origin main
