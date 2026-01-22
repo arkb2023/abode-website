@@ -18,8 +18,8 @@ phases:
       - echo ""
       - echo ""
       - echo "+++++++++++++++++BUILD++++++++++++++++++++++++++++++++"
-      - echo "CODEBUILD_SOURCE_VERSION:" "$CODEBUILD_SOURCE_VERSION"
-      - BRANCH=$(echo $CODEBUILD_SOURCE_VERSION | sed 's|refs/heads/||')
+      - echo "CODEBUILD_WEBHOOK_HEAD_REF:" "$CODEBUILD_WEBHOOK_HEAD_REF"
+      - BRANCH=$(echo $CODEBUILD_WEBHOOK_HEAD_REF | sed 's|refs/heads/||')
       - echo "BRANCH:" "$BRANCH"
       - COMMIT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - echo "COMMIT_SHA:" "$COMMIT_SHA"
@@ -36,8 +36,8 @@ phases:
       - echo ""
       - echo "+++++++++++++++++POST BUILD++++++++++++++++++++++++++++++++"
       - echo "Pushing to Docker Hub..."
-      - echo "CODEBUILD_SOURCE_VERSION:" "$CODEBUILD_SOURCE_VERSION"
-      - BRANCH=$(echo $CODEBUILD_SOURCE_VERSION | sed 's|refs/heads/||')
+      - echo "CODEBUILD_WEBHOOK_HEAD_REF:" "$CODEBUILD_WEBHOOK_HEAD_REF"
+      - BRANCH=$(echo $CODEBUILD_WEBHOOK_HEAD_REF | sed 's|refs/heads/||')
       - echo "BRANCH:" "$BRANCH"
       - COMMIT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - echo "COMMIT_SHA:" "$COMMIT_SHA"
