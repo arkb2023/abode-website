@@ -11,6 +11,8 @@ pipeline {
             steps {
                 script {
                     try {
+                        def source = env.SOURCE ?: 'github'
+                        
                         // Read config.properties from repo root
                         def configFile = readFile(file: 'config.properties')
                         def props = [:]
@@ -24,6 +26,7 @@ pipeline {
                         }
                         
                         // Set environment variables from config
+                        env.SOURCE = source
                         env.DOCKER_HUB_USER = props.DOCKER_HUB_USER ?: 'arkb2023'
                         env.IMAGE_NAME = props.IMAGE_NAME ?: 'abode-website'
                         env.BUILD_TAG_PREFIX = props.BUILD_TAG_PREFIX ?: 'v1.0'
@@ -57,7 +60,7 @@ pipeline {
                     } catch (Exception e) {
                         echo "Error loading config: ${e.message}"
                         echo "Proceeding with defaults..."
-                        
+                        env.SOURCE = 'github'
                         env.DOCKER_HUB_USER = 'arkb2023'
                         env.IMAGE_NAME = 'abode-website'
                         env.BUILD_TAG_PREFIX = 'v1.0'
@@ -77,6 +80,9 @@ pipeline {
         }
         
         stage('Build') {
+            when { 
+              expression { env.SOURCE == 'github' }
+            }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
                                                     usernameVariable: 'DOCKER_USER', 
