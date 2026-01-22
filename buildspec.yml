@@ -1,5 +1,4 @@
 version: 0.2
-
 env:
   secrets-manager:
     DOCKERHUB_USERNAME: "codebuild/dockerhub/credentials:username"
@@ -8,60 +7,70 @@ env:
 phases:
   pre_build:
     commands:
+      - echo ""
+      - echo ""
+      - echo "+++++++++++++++++PRE_BUILD++++++++++++++++++++++++++++++++"
       - echo "Logging into Docker Hub..."
       - echo "$DOCKERHUB_PASSWORD" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
-      - |
-        BRANCH=$(echo $CODEBUILD_SOURCE_VERSION | sed 's|refs/heads/||')
-        COMMIT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-        BUILD_NUM=${CODEBUILD_BUILD_NUMBER}
-        IMAGE_TAG="${BRANCH}-v1.0-${BUILD_NUM}-${COMMIT_SHA}"
-        
-        if [ "$BRANCH" == "main" ]; then
-          DEPLOY_TO_PROD="true"
-        else
-          DEPLOY_TO_PROD="false"
-        fi
-        
-        echo "IMAGE_TAG=${IMAGE_TAG}" >> /tmp/build.env
-        echo "BRANCH=${BRANCH}" >> /tmp/build.env
-        echo "DEPLOY_TO_PROD=${DEPLOY_TO_PROD}" >> /tmp/build.env
-        source /tmp/build.env
-        
-        echo "════════════════════════════════════════════════"
-        echo "Build Configuration"
-        echo "════════════════════════════════════════════════"
-        echo "Branch: $BRANCH"
-        echo "Commit: $COMMIT_SHA"
-        echo "Build Number: $BUILD_NUM"
-        echo "Image Tag: $IMAGE_TAG"
-        echo "Deploy to Prod: $DEPLOY_TO_PROD"
-        echo "════════════════════════════════════════════════"
+      # - >
+      #   BRANCH=$(echo $CODEBUILD_SOURCE_VERSION | sed 's|refs/heads/||') &&
+      #   COMMIT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7) &&
+      #   BUILD_NUM=${CODEBUILD_BUILD_NUMBER} &&
+      #   IMAGE_TAG="${BRANCH}-v1.0-${BUILD_NUM}-${COMMIT_SHA}" &&
+      #   if [ "$BRANCH" == "main" ]; then
+      #     DEPLOY_TO_PROD="true"
+      #   else
+      #     DEPLOY_TO_PROD="false"
+      #   fi &&
+      #   echo "IMAGE_TAG=${IMAGE_TAG}" >> /tmp/build.env &&
+      #   echo "BRANCH=${BRANCH}" >> /tmp/build.env &&
+      #   echo "DEPLOY_TO_PROD=${DEPLOY_TO_PROD}" >> /tmp/build.env &&
+      #   source /tmp/build.env &&
+      #   echo "====================================" &&
+      #   echo "Build Configuration" &&
+      #   echo "====================================" &&
+      #   echo "Branch: $BRANCH" &&
+      #   echo "Commit: $COMMIT_SHA" &&
+      #   echo "Build Number: $BUILD_NUM" &&
+      #   echo "Image Tag: $IMAGE_TAG" &&
+      #   echo "Deploy to Prod: $DEPLOY_TO_PROD" &&
+      #   echo "====================================" 
 
   build:
     commands:
-      - source /tmp/build.env
+      #- source /tmp/build.env
+      - echo ""
+      - echo ""
+      - echo "+++++++++++++++++BUILD++++++++++++++++++++++++++++++++"
+      - echo "CODEBUILD_SOURCE_VERSION: $CODEBUILD_SOURCE_VERSION"
+      - BRANCH=$(echo $CODEBUILD_SOURCE_VERSION | sed 's|refs/heads/||')
+      - echo "BRANCH: $BRANCH"
+      - COMMIT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - echo "COMMIT_SHA: $COMMIT_SHA"
+      - BUILD_NUM=${CODEBUILD_BUILD_NUMBER}
+      - echo "BUILD_NUM: $BUILD_NUM"
+      # - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG="${BRANCH}-v1.0-${BUILD_NUM}-${COMMIT_SHA}" 
       - echo "Building: arkb2023/abode-website:${IMAGE_TAG}"
       - docker build -t arkb2023/abode-website:${IMAGE_TAG} .
       - docker tag arkb2023/abode-website:${IMAGE_TAG} arkb2023/abode-website:latest
       
   post_build:
     commands:
-      - source /tmp/build.env
+      #- source /tmp/build.env
+      - echo ""
+      - echo ""
+      - echo "+++++++++++++++++POST BUILD++++++++++++++++++++++++++++++++"
       - echo "Pushing to Docker Hub..."
       - docker push arkb2023/abode-website:${IMAGE_TAG}
       - docker push arkb2023/abode-website:latest
-      - echo ""
-      - echo "════════════════════════════════════════════════"
       - echo "Push Complete"
-      - echo "════════════════════════════════════════════════"
       - echo "Image: arkb2023/abode-website:${IMAGE_TAG}"
       - echo "Branch: ${BRANCH}"
       - echo "Commit: ${COMMIT_SHA}"
-      - |
-        source /tmp/build.env
-        if [ "$DEPLOY_TO_PROD" == "true" ]; then
-          echo "Action: Jenkins will TEST + DEPLOY to prod"
-        else
-          echo "Action: Jenkins will TEST only"
-        fi
-      - echo "════════════════════════════════════════════════"
+      # - >
+      #   if [ "$DEPLOY_TO_PROD" == "true" ]; then
+      #     echo "🚀 Action: Jenkins will TEST + DEPLOY to prod";
+      #   else
+      #     echo "🧪 Action: Jenkins will TEST only";
+      #   fi
