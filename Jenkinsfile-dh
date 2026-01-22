@@ -2,6 +2,7 @@ pipeline {
     agent any
     
     parameters {
+        string(name: 'image_tag', defaultValue: 'latest', description: 'DockerHub image tag')
         string(name: 'PROD_HOST', defaultValue: '10.158.148.115', description: 'Prod VM IP')
         string(name: 'PROD_USER', defaultValue: 'ubuntu', description: 'Prod SSH user')
     }
@@ -11,13 +12,10 @@ pipeline {
             steps {
                 script {
                     try {
-                        def source = env.SOURCE ?: 'github'
-                        
-                        // Read config.properties from repo root
+                        // Read config.properties
                         def configFile = readFile(file: 'config.properties')
                         def props = [:]
                         
-                        // Parse properties manually
                         configFile.split('\n').each { line ->
                             if (line && !line.startsWith('#') && line.contains('=')) {
                                 def (key, value) = line.split('=', 2)
@@ -25,94 +23,85 @@ pipeline {
                             }
                         }
                         
-                        // Set environment variables from config
-                        env.SOURCE = source
+                        // SOURCE = dockerhub (this job is triggered by DockerHub!)
+                        env.SOURCE = 'dockerhub'
                         env.DOCKER_HUB_USER = props.DOCKER_HUB_USER ?: 'arkb2023'
                         env.IMAGE_NAME = props.IMAGE_NAME ?: 'abode-website'
-                        env.BUILD_TAG_PREFIX = props.BUILD_TAG_PREFIX ?: 'v1.0'
                         env.PROD_HOST = params.PROD_HOST ?: props.PROD_HOST ?: '10.158.148.115'
                         env.PROD_USER = params.PROD_USER ?: props.PROD_USER ?: 'ubuntu'
-                        env.TEST_HOST = params.TEST_HOST ?: props.TEST_HOST ?: '10.158.148.84'
-                        env.TEST_USER = params.TEST_USER ?: props.TEST_USER ?: 'ubuntu'
+                        env.TEST_HOST = props.TEST_HOST ?: '10.158.148.84'
+                        env.TEST_USER = props.TEST_USER ?: 'ubuntu'
                         env.TEST_PORT = props.TEST_PORT ?: '8081'
                         
-                        // Calculate BUILD_TAG
-                        env.BUILD_TAG = "${env.BUILD_TAG_PREFIX}-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        env.IMAGE = "${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:${env.BUILD_TAG}"
+                        // CRITICAL: Use image_tag from DockerHub webhook!
+                        env.IMAGE_TAG = params.image_tag ?: 'latest'
+                        env.IMAGE = "${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                         
-                        // Determine branch info
-                        def branch = env.branch ?: 'unknown'
-                        env.IS_MAIN = (branch == 'refs/heads/main') ? 'true' : 'false'
-                        env.IS_DEVELOP = (branch == 'refs/heads/develop') ? 'true' : 'false'
-                        env.SHORT_BRANCH = branch.replaceAll('refs/heads/', '')
+                        // Determine if main branch by tag convention
+                        // DockerHub tags: main-v1.0-123 OR v1.0-123
+                        env.IS_MAIN = (env.IMAGE_TAG.startsWith('main-')) ? 'true' : 'false'
+                        env.SOURCE_BRANCH = (env.IS_MAIN == 'true') ? 'main' : 'develop'
                         
-                        // Log configuration
                         echo "════════════════════════════════════════════════"
-                        echo "Configuration Loaded"
+                        echo "DockerHub Configuration Loaded"
                         echo "════════════════════════════════════════════════"
                         echo "Source: ${env.SOURCE}"
                         echo "Image: ${env.IMAGE}"
-                        echo "Branch: ${env.SHORT_BRANCH}"
-                        echo "Build Mode: ${env.IS_MAIN == 'true' ? 'FULL (Build→Test→Deploy)' : 'TEST ONLY (Build→Test)'}"
+                        echo "Image Tag: ${env.IMAGE_TAG}"
+                        echo "Branch (from tag): ${env.SOURCE_BRANCH}"
+                        echo "Deploy to Prod: ${env.IS_MAIN == 'true' ? 'YES' : 'NO'}"
                         echo "Prod Target: ${env.PROD_USER}@${env.PROD_HOST}"
                         echo "Test Target: ${env.TEST_USER}@${env.TEST_HOST}:${env.TEST_PORT}"
                         echo "════════════════════════════════════════════════"
                         
                     } catch (Exception e) {
                         echo "Error loading config: ${e.message}"
-                        echo "Proceeding with defaults..."
-                        env.SOURCE = 'github'
+                        env.SOURCE = 'dockerhub'
                         env.DOCKER_HUB_USER = 'arkb2023'
                         env.IMAGE_NAME = 'abode-website'
-                        env.BUILD_TAG_PREFIX = 'v1.0'
+                        env.IMAGE_TAG = params.image_tag ?: 'latest'
+                        env.IMAGE = "${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                         env.PROD_HOST = params.PROD_HOST ?: '10.158.148.115'
                         env.PROD_USER = params.PROD_USER ?: 'ubuntu'
-                        env.TEST_HOST = params.TEST_HOST ?: '10.158.148.84'
-                        env.TEST_USER = params.TEST_USER ?: 'ubuntu'                  
-                        env.TEST_PORT = env.TEST_PORT ?: '8081'
-                        env.BUILD_TAG = "${env.BUILD_TAG_PREFIX}-${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        env.IMAGE = "${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:${env.BUILD_TAG}"
-                        env.SHORT_BRANCH = env.GIT_BRANCH ?: 'unknown'
-                        env.IS_MAIN = (env.SHORT_BRANCH == 'main') ? 'true' : 'false'
-
+                        env.TEST_HOST = '10.158.148.84'
+                        env.TEST_USER = 'ubuntu'
+                        env.TEST_PORT = '8081'
+                        env.IS_MAIN = (env.IMAGE_TAG.startsWith('main-')) ? 'true' : 'false'
                     }
                 }
             }
         }
         
-        stage('Build') {
-            when { 
-              expression { env.SOURCE == 'github' }
-            }
+        stage('DockerHub Webhook Info') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                    usernameVariable: 'DOCKER_USER', 
-                                                    passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        chmod +x ./scripts/build.sh
-                        ./scripts/build.sh "${DOCKER_HUB_USER}" "${IMAGE_NAME}" "${BUILD_TAG}" "${DOCKER_USER}" "${DOCKER_PASS}"
-                    '''
-                }
+                echo """
+                🚀 DockerHub Webhook Triggered!
+                📦 Image: ${env.IMAGE}
+                🏷️  Tag: ${env.IMAGE_TAG}
+                🌿 Branch: ${env.SOURCE_BRANCH}
+                ✅ Received pre-built image (skip build)
+                """
             }
         }
         
         stage('Test') {
             steps {
-              echo "Running tests on Test Host (${env.SHORT_BRANCH} branch)"
-              sshagent(credentials: ['prod-ssh-key']) {
-                  sh '''
-                      chmod +x ./scripts/test.sh
-                      ./scripts/test.sh "${TEST_USER}" "${TEST_HOST}" "${IMAGE}"
-                  '''
-              }            
+                echo "🧪 Testing image: ${env.IMAGE}"
+                sshagent(credentials: ['prod-ssh-key']) {
+                    sh '''
+                        chmod +x ./scripts/test.sh
+                        ./scripts/test.sh "${TEST_USER}" "${TEST_HOST}" "${IMAGE}"
+                    '''
+                }
             }
         }
+        
         stage('Deploy Prod') {
             when {
                 expression { env.IS_MAIN == 'true' }
             }
             steps {
-                echo "Deploying to Production (${env.SHORT_BRANCH} branch)"
+                echo "🚀 Deploying to Production: ${env.IMAGE}"
                 sshagent(credentials: ['prod-ssh-key']) {
                     sh '''
                         chmod +x ./scripts/deploy.sh
@@ -127,14 +116,14 @@ pipeline {
                 script {
                     echo ""
                     echo "════════════════════════════════════════════════"
+                    echo "DockerHub Pipeline Complete"
                     if (env.IS_MAIN == 'true') {
-                        echo "Full Pipeline Complete"
-                        echo "   Stages: Build → Test → Deploy"
-                        echo "   Status: Live at http://${env.PROD_HOST}"
+                        echo "   Stages: Test → Deploy"
+                        echo "   Image: ${env.IMAGE}"
+                        echo "   Live: http://${env.PROD_HOST}"
                     } else {
-                        echo "Build & Test Complete"
-                        echo "   Stages: Build → Test"
-                        echo "   Status: Deploy skipped (${env.SHORT_BRANCH} branch)"
+                        echo "   Stages: Test (Deploy skipped)"
+                        echo "   Image: ${env.IMAGE}"
                     }
                     echo "════════════════════════════════════════════════"
                 }
@@ -147,10 +136,10 @@ pipeline {
             cleanWs() 
         }
         failure { 
-            echo "Pipeline FAILED"
+            echo "❌ Pipeline FAILED: ${env.IMAGE}"
         }
         success { 
-            echo "Pipeline SUCCESS - Image: ${env.IMAGE}"
+            echo "✅ Pipeline SUCCESS: ${env.IMAGE}"
         }
     }
 }
