@@ -10,8 +10,9 @@ pipeline {
     stage('Image Validation') {
       steps {
         script {
-          def image = "arkb2023/${params.dh_repo}:${params.image_tag}"
-          
+          //def image = "arkb2023/${params.dh_repo}:${params.image_tag}"
+          // Docker Hub passes username
+          def image = "${params.dh_repo}:${params.image_tag}"
           sh """
             chmod +x scripts/smoke.sh
             ./scripts/smoke.sh "${image}"

@@ -16,7 +16,7 @@ pipeline {
           sh """
             chmod +x scripts/test.sh
             ./scripts/test.sh "\${TEST_USER}" "\${TEST_HOST}" \
-              "arkb2023/\${dh_repo}:\${image_tag}" "\${TEST_PORT}"
+              "\${dh_repo}:\${image_tag}" "\${TEST_PORT}"
           """
         }
       }

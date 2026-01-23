@@ -16,7 +16,7 @@ pipeline {
           sh """
             chmod +x scripts/deploy.sh
             ./scripts/deploy.sh "\${PROD_USER}" "\${PROD_HOST}" \
-              "arkb2023/\${dh_repo}:\${image_tag}" "\${PROD_PORT}"
+              "\${dh_repo}:\${image_tag}" "\${PROD_PORT}"
           """
         }
       }
