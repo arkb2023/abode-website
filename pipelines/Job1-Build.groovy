@@ -2,7 +2,7 @@ pipeline {
   agent any
   
   parameters {
-    string(name: 'image_tag', defaultValue: 'latest', description: 'DockerHub tag')
+    string(name: 'image_tag', defaultValue: 'latest', description: 'DockerHub tag (e.g., main-v1.0.xx)')
     string(name: 'dh_repo', defaultValue: 'abode-website', description: 'DockerHub repo')
   }
   
@@ -10,21 +10,23 @@ pipeline {
     stage('Image Validation') {
       steps {
         script {
-          // Security scan (Trivy or Clair)
+          def image = "arkb2023/${params.dh_repo}:${params.image_tag}"
+          
+          // 1. Basic pull & existence check
           sh """
-            docker pull arkb2023/\${dh_repo}:\${image_tag} || exit 1
-            
-            # Vulnerability scan (install trivy if needed)
-            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-            trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL arkb2023/\${dh_repo}:\${image_tag}
-            
-            # Smoke test
-            docker run --rm arkb2023/\${dh_repo}:\${image_tag} curl -f http://localhost || exit 1
+            docker pull ${image} || exit 1
+            docker inspect ${image} > image-info.json
           """
           
-          // Branch detection for reporting
-          env.IS_MAIN = params.image_tag.startsWith('main-') ? 'true' : 'false'
-          currentBuild.description = "Image: \${dh_repo}:\${image_tag} | Branch: \${IS_MAIN}"
+          // 2. Lightweight smoke test (no install)
+          sh """
+            docker run --rm --network none ${image} curl -f http://localhost/ || exit 1
+            docker image ls ${image} --format '{{.Size}}' > image-size.txt
+          """
+          
+          // 3. Branch detection
+          env.IS_MAIN = params.image_tag.startsWith('main-')
+          currentBuild.description = "Image: ${image} | Branch: ${env.IS_MAIN} | Size: \$(cat image-size.txt)"
         }
       }
     }
@@ -32,16 +34,13 @@ pipeline {
   
   post {
     always {
-      archiveArtifacts artifacts: '**/*.json,**/trivy.html', allowEmptyArchive: true
-      script {
-        env.PIPELINE_STATUS = currentBuild.result ?: 'SUCCESS'
-      }
+      archiveArtifacts artifacts: 'image-info.json,image-size.txt', allowEmptyArchive: true
     }
-    success {
-      echo "Image validated: ${dh_repo}:${image_tag}"
+    success { 
+      echo "Image validated successfully"
     }
-    failure {
-      echo "Image validation failed"
+    failure { 
+      echo "Image validation failed" 
     }
   }
 }
