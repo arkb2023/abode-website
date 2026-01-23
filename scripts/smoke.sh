@@ -5,8 +5,8 @@ IMAGE="$1"  # arkb2023/abode-website:main-v1.0.xx
 
 # Pull latest image
 echo "Pulling image from Docker Hub..."
-echo "   Image: \${IMAGE}"
-docker pull \${IMAGE} || {
+echo "   Image: ${IMAGE}"
+docker pull ${IMAGE} || {
   echo "Failed to pull image"
   exit 1
 }
